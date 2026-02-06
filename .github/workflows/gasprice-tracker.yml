@@ -4,8 +4,8 @@ on:
   push:
     branches: ["main"]
   schedule:
-    # UTC 21:00 = Toronto 4:00 PM (Winter/EST) / 5:00 PM (Summer/EDT)
-    - cron: "0 21 * * *"
+    # UTC 20:45 = Toronto 3:45 PM (Winter/EST) / 4:45 PM (Summer/EDT)
+    - cron: "45 20 * * *"
   workflow_dispatch:
 
 permissions:

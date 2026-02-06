@@ -3,9 +3,9 @@ name: Gas Price Tracker
 on:
   push:
     branches: ["main"]
-  schedule:
-    # UTC 20:45 = Toronto 3:45 PM (Winter/EST) / 4:45 PM (Summer/EDT)
-    - cron: "45 20 * * *"
+  # schedule:
+  #   # UTC 20:45 = Toronto 3:45 PM (Winter/EST) / 4:45 PM (Summer/EDT)
+  #   - cron: "45 20 * * *"
   workflow_dispatch:
 
 permissions:

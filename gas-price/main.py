@@ -1,8 +1,13 @@
 import os
 import re
+import sys
 import json
 import smtplib
 import requests
+
+# Ensure UTF-8 output on Windows consoles
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
@@ -64,65 +69,41 @@ def _today_tomorrow() -> tuple[str, str]:
 # ── citynews.ca scraper ───────────────────────────────────────────────────────
 
 def _parse_citynews(html: str) -> list[DayPrice]:
-    soup = BeautifulSoup(html, "html.parser")
+    # Strip tags and entities for plain-text parsing
+    text = re.sub(r'<[^>]+>', ' ', html)
+    text = re.sub(r'&#\d+;', '', text)
+    text = re.sub(r'&\w+;', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
 
-    # Grab the most relevant content block
-    content = (
-        soup.find("article")
-        or soup.find(class_=re.compile(r"entry|post|article|content", re.I))
-        or soup
-    )
-    text = content.get_text(" ", strip=True)
-
-    today_str, tomorrow_str = _today_tomorrow()
-
-    # ------------------------------------------------------------------
-    # Extract a price (3 digits + optional decimal) near a fuel keyword.
-    # Splits text into sentences and searches each sentence for a pair
-    # (fuel keyword + price in the 100–250 range).
-    # ------------------------------------------------------------------
-    def find_price(fuel_re: str) -> str:
-        for sentence in re.split(r"[.!\n]", text):
-            if re.search(fuel_re, sentence, re.I):
-                m = re.search(r"\b(\d{3}(?:\.\d)?)\b", sentence)
-                if m and 100.0 <= float(m.group(1)) <= 250.0:
-                    return m.group(1)
-        return ""
-
-    regular = find_price(r"\bregular\b")
-    premium = find_price(r"\bpremium\b")
-
-    # Fallback: pick the first plausible price in the whole text
-    if not regular:
-        m = re.search(r"\b(\d{3}(?:\.\d)?)\s*(?:cents?|¢)", text, re.I)
-        if m and 100.0 <= float(m.group(1)) <= 250.0:
-            regular = m.group(1)
-
-    if not regular:
+    # CityNews format: "holding at an average of 186.9 cent(s)/litre"
+    price_m = re.search(r'average of (\d{3}(?:\.\d)?)\s*cent', text, re.I)
+    if not price_m:
         return []
 
-    # Determine if prices are for today or tomorrow
-    lower = text.lower()
-    is_tomorrow = bool(re.search(r"\btomorrow\b", lower[:600]))
-    label = "Tomorrow" if is_tomorrow else "Today"
-    date_str = tomorrow_str if is_tomorrow else today_str
+    price = price_m.group(1)
 
-    # Extract change direction  (+3¢ / -2¢)
-    regular_change = ""
-    up = re.search(r"(?:rise|increase|jump|up)\D{0,30}?(\d+(?:\.\d)?)\s*(?:cent|¢)", text, re.I)
-    dn = re.search(r"(?:fall|drop|decrease|down)\D{0,30}?(\d+(?:\.\d)?)\s*(?:cent|¢)", text, re.I)
-    if up:
-        regular_change = f"+{up.group(1)}¢"
-    elif dn:
-        regular_change = f"-{dn.group(1)}¢"
+    # Date: "at 12:01am on May 11, 2026"
+    window = text[max(0, price_m.start() - 300): price_m.start() + 50]
+    date_m = re.search(
+        r'on\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4})',
+        window, re.I,
+    )
+    today_str, tomorrow_str = _today_tomorrow()
+    date_str = date_m.group(1) if date_m else today_str
 
-    return [DayPrice(
-        label=label,
-        date=date_str,
-        regular=regular,
-        regular_change=regular_change,
-        premium=premium,
-    )]
+    # Change: look for rise/fall indicator near the price sentence
+    context = text[max(0, price_m.start() - 600): price_m.end()]
+    change = "n/c"
+    up_m = re.search(r'(?:rise|increase)\D{0,30}?(\d+(?:\.\d)?)\s*cent', context, re.I)
+    dn_m = re.search(r'(?:fall|drop|decrease)\D{0,30}?(\d+(?:\.\d)?)\s*cent', context, re.I)
+    if up_m:
+        change = f"+{up_m.group(1)}c"
+    elif dn_m:
+        change = f"-{dn_m.group(1)}c"
+
+    label = "Tomorrow" if date_str == tomorrow_str else "Today"
+
+    return [DayPrice(label=label, date=date_str, regular=price, regular_change=change)]
 
 
 def fetch_citynews(city: str) -> GasReport | None:
@@ -133,7 +114,7 @@ def fetch_citynews(city: str) -> GasReport | None:
         r.raise_for_status()
         days = _parse_citynews(r.text)
         if days:
-            print("  Source: citynews.ca ✓")
+            print("  Source: citynews.ca [OK]")
             return GasReport(city="Toronto (GTA)", days=days, source_url=CITYNEWS_URL)
         print("  citynews.ca: no prices found in page")
     except Exception as e:
@@ -169,7 +150,7 @@ def fetch_gaswizard(city: str) -> GasReport | None:
         print(f"  gaswizard.ca error: {e}")
         return None
 
-    start = re.search(r'class="single-city-prices"', html)
+    start = re.search(r'class="single-city-prices', html)
     if not start:
         print("  gaswizard.ca: price block not found")
         return None
@@ -205,7 +186,7 @@ def fetch_gaswizard(city: str) -> GasReport | None:
     except ValueError:
         pass
 
-    print("  Source: gaswizard.ca ✓")
+    print("  Source: gaswizard.ca [OK]")
     return GasReport(city=city.title(), days=day_prices, source_url=url)
 
 
@@ -213,7 +194,7 @@ def fetch_gas_report(city: str) -> GasReport | None:
     report = fetch_citynews(city)
     if report:
         return report
-    print("  Falling back to gaswizard.ca…")
+    print("  Falling back to gaswizard.ca...")
     return fetch_gaswizard(city)
 
 # ── Email ─────────────────────────────────────────────────────────────────────
@@ -283,7 +264,7 @@ def _build_html(user: User, report: GasReport) -> str:
 def _build_text(user: User, report: GasReport) -> str:
     lines = [
         f"Hi {user.name}, gas prices in {report.city}:",
-        "─" * 44,
+        "-" * 44,
     ]
     for dp in report.days:
         regu = f"{dp.regular}¢/L"
@@ -294,7 +275,7 @@ def _build_text(user: User, report: GasReport) -> str:
             prem += f" ({dp.premium_change})"
         lines.append(f"{dp.label} ({dp.date})")
         lines.append(f"  Regular: {regu}   Premium: {prem}")
-    lines += ["─" * 44, f"Source: {report.source_url}"]
+    lines += ["-" * 44, f"Source: {report.source_url}"]
     return "\n".join(lines)
 
 
@@ -317,9 +298,9 @@ def send_email(user: User, report: GasReport):
             s.starttls()
             s.login(sender, password)
             s.send_message(msg)
-        print(f"  ✅ Email sent to {user.name} ({user.email})")
+        print(f"  [OK] Email sent to {user.name} ({user.email})")
     except Exception as e:
-        print(f"  ❌ Email failed: {e}")
+        print(f"  [FAIL] Email: {e}")
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -327,7 +308,7 @@ def main():
     try:
         users = [User(**u) for u in json.loads(os.environ.get("USERS", "[]"))]
     except Exception as e:
-        print(f"❌ Invalid USERS config: {e}")
+        print(f"[FAIL] Invalid USERS config: {e}")
         return
 
     if not users:
@@ -341,10 +322,10 @@ def main():
             print(f"\n[{user.name}] Skipped (subscribe=false)")
             continue
 
-        print(f"\n[{user.name}] Fetching {user.city}…")
+        print(f"\n[{user.name}] Fetching {user.city}...")
         report = fetch_gas_report(user.city)
         if not report:
-            print("  ❌ No data available.")
+            print("  [FAIL] No data available.")
             continue
 
         print(_build_text(user, report))

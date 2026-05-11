@@ -1,11 +1,9 @@
 name: Gas Price Tracker
 
 on:
-  # push:
-  #   branches: ["main"]
-  # schedule:
-  #   # UTC 20:45 = Toronto 3:45 PM (Winter/EST) / 4:45 PM (Summer/EDT)
-  #   - cron: "45 20 * * *"
+  schedule:
+    # UTC 21:00 = 5:00 PM EDT (Toronto summer) / 4:00 PM EST (Toronto winter)
+    - cron: "0 21 * * *"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install requests beautifulsoup4 curl_cffi
 
       - name: Run main.py
         env:
@@ -38,5 +36,4 @@ jobs:
           SENDER_PASS: ${{ secrets.PASSWORD }}
           USERS: ${{ vars.USERS }}
           ENABLE_EMAIL: ${{ vars.ENABLE_EMAIL }}
-
         run: python main.py

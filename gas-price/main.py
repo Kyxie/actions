@@ -191,11 +191,12 @@ def fetch_gaswizard(city: str) -> GasReport | None:
 
 
 def fetch_gas_report(city: str) -> GasReport | None:
-    report = fetch_citynews(city)
+    # gaswizard has today+tomorrow and all fuel types; citynews is the fallback
+    report = fetch_gaswizard(city)
     if report:
         return report
-    print("  Falling back to gaswizard.ca...")
-    return fetch_gaswizard(city)
+    print("  Falling back to citynews.ca...")
+    return fetch_citynews(city)
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 

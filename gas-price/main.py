@@ -344,9 +344,9 @@ def send_email(user: User, report: GasReport):
     msg.attach(MIMEText(_build_html(user, report), "html"))
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as s:
+        with smtplib.SMTP("smtp.resend.com", 587) as s:
             s.starttls()
-            s.login(sender, password)
+            s.login("resend", password)
             s.send_message(msg)
         print(f"  [OK] Email sent to {user.name} ({user.email})")
     except Exception as e:

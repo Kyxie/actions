@@ -32,7 +32,7 @@ jobs:
 
       - name: Run main.py
         env:
-          SENDER_EMAIL: ${{ secrets.USERNAME }}
+          SENDER_EMAIL: ${{ vars.USERNAME }}
           SENDER_PASS: ${{ secrets.PASSWORD }}
           USERS: ${{ vars.USERS }}
           ENABLE_EMAIL: ${{ vars.ENABLE_EMAIL }}

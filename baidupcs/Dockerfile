@@ -1,13 +1,16 @@
 # ---------- build stage ----------
-FROM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS builder
 
 ARG BPCS_VER
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /build
 
 RUN apk add --no-cache git
-RUN git clone --branch ${BPCS_VER} --depth 1 https://github.com/qjfoidnh/BaiduPCS-Go.git . \
+RUN git clone --branch "${BPCS_VER}" --depth 1 https://github.com/qjfoidnh/BaiduPCS-Go.git . \
     && go mod download \
-    && CGO_ENABLED=0 go build -ldflags="-s -w" -o BaiduPCS-Go main.go
+    && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+       go build -trimpath -ldflags="-s -w" -o BaiduPCS-Go .
 
 # ---------- runtime stage ----------
 FROM alpine:3.20

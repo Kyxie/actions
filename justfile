@@ -9,7 +9,7 @@ default:
 # ==============================================================================
 #  Menuconfig
 # ==============================================================================
-menuconfig_image_name := "kyxie/menuconfig:latest"
+menuconfig_image_name := "ghcr.io/kyxie/menuconfig:latest"
 menuconfig_output_dir := "openwrt"
 
 # Generate OpenWrt .config

@@ -13,7 +13,7 @@ A Docker environment designed for generating OpenWrt `.config` files. It saves y
   ```bash
   docker run --rm -it \
     -v $(pwd)/openwrt:/mnt/output \
-    kyxie/menuconfig:latest \
+    ghcr.io/kyxie/menuconfig:latest \
     bash -c "[ -f /mnt/output/.config ] && cp /mnt/output/.config .config; make menuconfig && cp .config /mnt/output/.config"
   ```
 

@@ -2,8 +2,8 @@ name: Gas Price Tracker
 
 on:
   schedule:
-    # UTC 21:00 = 5:00 PM EDT (Toronto summer) / 4:00 PM EST (Toronto winter)
-    - cron: "0 21 * * *"
+    - cron: "0 12 * * *"
+      timezone: "America/Toronto"
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,39 @@
+name: Securo Update Checker
+
+on:
+  schedule:
+    - cron: "20 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Get latest stable release tag
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.getLatestRelease({
+              owner: 'securo-finance',
+              repo: 'securo'
+            });
+            if (!/^v\d+\.\d+\.\d+$/.test(data.tag_name)) {
+              throw new Error('Expected a stable Securo release tag');
+            }
+            core.setOutput('tag', data.tag_name);
+
+  build:
+    needs: check
+    uses: ./.github/workflows/securo-builder.yml
+    with:
+      tag: ${{ needs.check.outputs.tag }}

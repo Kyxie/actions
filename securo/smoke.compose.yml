@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
+    environment:
+      POSTGRES_PASSWORD: smoke-test
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  server:
+    image: securo:smoke
+    environment:
+      DATABASE_URL: postgresql+asyncpg://securo:smoke-test@postgres:5432/securo
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_URL: http://localhost:8000
+      REGISTRATION_ENABLED: "false"
+    command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 2s
+      timeout: 4s
+      retries: 60

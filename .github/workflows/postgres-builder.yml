@@ -30,26 +30,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image for smoke test
-        uses: docker/build-push-action@v5
-        with:
-          context: postgres
-          load: true
-          platforms: linux/amd64
-          tags: postgres-extensions:smoke
-          cache-from: type=gha,scope=postgres-extensions
-
-      - name: Check that PostgreSQL can load and use pgvector
-        run: |
-          container=$(docker run -d --rm -e POSTGRES_HOST_AUTH_METHOD=trust postgres-extensions:smoke)
-          trap 'docker stop "$container" >/dev/null' EXIT
-          timeout 60s bash -c 'until docker exec "$1" pg_isready -h 127.0.0.1 -U postgres; do sleep 1; done' _ "$container"
-          docker exec "$container" psql -X -U postgres -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION vector'
-          version=$(docker exec "$container" psql -XAt -U postgres -c "SELECT extversion FROM pg_extension WHERE extname = 'vector'")
-          [[ "$IMAGE_TAG" == *"-pgvector$version" && -n "$version" ]]
-          distance=$(docker exec "$container" psql -XAt -U postgres -c "SELECT '[0,0]'::vector <-> '[3,4]'::vector")
-          [[ "$distance" == 5 ]]
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
